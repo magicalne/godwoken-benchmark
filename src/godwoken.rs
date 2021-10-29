@@ -531,6 +531,7 @@ pub async fn check_gw_balance(
 ) -> Result<u128> {
     let rollup_type_hash = H256::from_str(ROLLUP_TYPE_HASH)?;
     let addr = utils::privkey_to_short_address(pk, &rollup_type_hash, scripts_deployment)?;
+    log::info!("short address: {}", hex::encode(&addr));
     let addr = JsonBytes::from_bytes(addr);
     let mut rpc_client = GodwokenRpcClient::new(url);
     rpc_client.get_balance(addr, 1).await
