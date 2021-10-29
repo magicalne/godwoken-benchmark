@@ -1,7 +1,6 @@
 use bytes::Bytes;
 
 use crate::generated::packed;
-use crate::prelude::Pack as GwPack;
 use crate::prelude::*;
 use std::str;
 

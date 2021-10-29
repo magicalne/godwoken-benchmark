@@ -17,6 +17,7 @@ use crate::prelude::Pack as GwPack;
 use crate::types::ScriptsDeploymentResult;
 use crate::utils::{self, read_privkey};
 
+#[derive(Debug)]
 struct CallbackMsg {
     tx: Option<H256>,
     ts: time::Instant,
@@ -108,20 +109,20 @@ impl Plan {
             }
             now = Instant::now();
             let tx_info = self.next_batch();
-            tokio::spawn(send_batch(
-                tx_info,
-                self.scripts_deployment.clone(),
-                self.url.clone(),
-                self.sender.clone(),
-                self.rollup_type_hash.clone(),
-            ));
+            let scripts_deployment = self.scripts_deployment.clone();
+            let url = self.url.clone();
+            let sender = self.sender.clone();
+            let rollup_type_hash = self.rollup_type_hash.clone();
+            tokio::spawn(async {
+                send_batch(tx_info, scripts_deployment, url, sender, rollup_type_hash).await
+            });
         }
     }
 
     fn next_batch(&mut self) -> Vec<TransferInfo> {
         let right_bound = self.current_idx + self.req_batch_cnt;
         let from = if right_bound < self.pks.len() {
-            let batch_vec = Vec::from(&self.pks[self.current_idx..right_bound - 1]);
+            let batch_vec = Vec::from(&self.pks[self.current_idx..right_bound]);
             self.current_idx = right_bound;
             batch_vec
         } else {
@@ -129,6 +130,7 @@ impl Plan {
             self.current_idx = 0;
             batch_vec
         };
+
         let mut to = from.clone();
         to.rotate_right(1);
         from.into_iter()
@@ -197,7 +199,7 @@ async fn send_req(
     let to_address =
         utils::privkey_to_short_address(&pk_to, &rollup_type_hash, scripts_deployment)?;
 
-    let to_id = utils::short_address_to_account_id(rpc_client, &to_address).await?;
+    let _to_id = utils::short_address_to_account_id(rpc_client, &to_address).await?;
     // get from_id
     let from_address =
         utils::privkey_to_short_address(&pk_from, &rollup_type_hash, scripts_deployment)?;
@@ -275,7 +277,9 @@ impl TxStatsCollector {
     }
 
     async fn collect(&mut self) {
+        log::info!("Start collection");
         while let Some(msg) = self.receiver.recv().await {
+            log::trace!("recv callback msg: {:?}", &msg);
             match msg.tx {
                 Some(tx) => {
                     let url = self.url.clone();
@@ -314,8 +318,10 @@ impl Stats {
     }
 
     async fn run(&mut self, mut receiver: Receiver<TxStatus>) {
+        log::info!("Start stats");
         let mut timer = Instant::now();
         while let Some(tx_status) = &mut receiver.recv().await {
+            log::trace!("recv tx status: {:?}", tx_status);
             match tx_status {
                 TxStatus::Success => self.success += 1,
                 TxStatus::Failure => self.failure += 1,
@@ -330,6 +336,7 @@ impl Stats {
     }
 }
 
+#[derive(Debug)]
 enum TxStatus {
     Success,
     Failure,
