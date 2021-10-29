@@ -66,13 +66,14 @@ impl Plan {
                     .await
                     {
                         log::info!("pk: {:?} balance: {:?}", hex::encode(&pk), balance);
-                        // if balance > 100 {
-                        pks.push(pk);
-                        // }
+                        if balance > 100 {
+                            pks.push(pk);
+                        }
                     }
                 }
             }
         }
+        log::info!("Total accounts: {}", pks.len());
         let (callback_sender, callback_receiver) = mpsc::channel(200);
         let (tx_status_sender, tx_status_receiver) = mpsc::channel(200);
         log::info!("spawn stats");
