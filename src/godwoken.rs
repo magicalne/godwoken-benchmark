@@ -1,3 +1,4 @@
+use std::fmt;
 use std::io::BufRead;
 use std::str::FromStr;
 use std::time::{self, Duration, Instant};
@@ -147,12 +148,27 @@ impl Plan {
     }
 }
 
+#[derive(Debug)]
 struct TransferInfo {
     pk_from: H256,
     pk_to: H256,
     amount: u128,
     fee: u128,
     sudt_id: u32,
+}
+
+impl fmt::Display for TransferInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "from: {}, to:{}, amount: {}, fee: {}, sudt_id: {}",
+            hex::encode(&self.pk_from),
+            hex::encode(&self.pk_to),
+            self.amount,
+            self.fee,
+            self.sudt_id,
+        )
+    }
 }
 
 async fn send_batch(
@@ -165,6 +181,7 @@ async fn send_batch(
     let rpc_client = GodwokenRpcClient::new(url);
     stream::iter(trans)
         .for_each(|t| {
+            log::debug!("transfer info: {:?}", &t);
             let mut rpc_client = rpc_client.clone();
             let scripts_deployment = scripts_deployment.clone();
             let callback = callback.clone();
