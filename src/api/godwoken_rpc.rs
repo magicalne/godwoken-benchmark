@@ -1,7 +1,6 @@
 use anyhow::Result;
 use ckb_jsonrpc_types::{JsonBytes, Script, Uint128, Uint32};
 use ckb_types::H256;
-use jsonrpc_core::request;
 // use gw_jsonrpc_types::{
 //     ckb_jsonrpc_types::{JsonBytes, Uint128, Uint32},
 //     debugger::{DumpChallengeTarget, ReprMockTransaction},
@@ -21,8 +20,7 @@ pub struct GodwokenRpcClient {
 }
 
 impl GodwokenRpcClient {
-    pub fn new(url: &str) -> GodwokenRpcClient {
-        let url = reqwest::Url::parse(url).expect("godwoken uri, e.g. \"http://127.0.0.1:8119\"");
+    pub fn new(url: reqwest::Url) -> GodwokenRpcClient {
         GodwokenRpcClient {
             url,
             id: 0,
@@ -106,10 +104,9 @@ impl GodwokenRpcClient {
             .map(Into::into)
     }
 
-    // pub fn execute_l2transaction(&mut self, l2tx: JsonBytes) -> Result<RunResult, String> {
+    // pub async fn execute_l2transaction(&mut self, l2tx: JsonBytes) -> Result<RunResult> {
     //     let params = serde_json::to_value((l2tx,)).map_err(|err| err.to_string())?;
-    //     self.rpc::<RunResult>("execute_l2transaction", params)
-    //         .map(Into::into)
+    //     self.rpc::<RunResult>("execute_l2transaction", params).await
     // }
 
     // pub fn execute_raw_l2transaction(&mut self, raw_l2tx: JsonBytes) -> Result<RunResult, String> {

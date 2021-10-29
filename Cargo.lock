@@ -1051,6 +1051,7 @@ dependencies = [
  "ckb-types",
  "clap",
  "env_logger",
+ "futures",
  "hex",
  "jsonrpc-core 17.1.0",
  "lazy_static",

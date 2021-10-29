@@ -1,21 +1,58 @@
 use anyhow::Result;
-use godwoken_stress_test::godwoken;
+use clap::{App, Arg};
+use godwoken_stress_test::godwoken::Plan;
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 200)]
 pub async fn main() -> Result<()> {
     env_logger::init_from_env(env_logger::Env::default().default_filter_or("info"));
-    log::info!("test");
-    let mut godwoken = godwoken::Godwoken::new(
-        "./accounts",
-        "http://localhost:8119",
-        "./scripts-deploy-result.json",
+    let m = App::new("gw benchmark")
+        .arg(
+            Arg::with_name("interval")
+                .short("i")
+                .takes_value(true)
+                .help("interval"),
+        )
+        .arg(
+            Arg::with_name("batch")
+                .short("b")
+                .takes_value(true)
+                .help("batch"),
+        )
+        .arg(
+            Arg::with_name("account-path")
+                .short("p")
+                .takes_value(true)
+                .help("accounts path"),
+        )
+        .arg(
+            Arg::with_name("url")
+                .short("u")
+                .takes_value(true)
+                .help("godwoken url"),
+        )
+        .arg(
+            Arg::with_name("scripts_deployment_path")
+                .short("s")
+                .takes_value(true)
+                .help("scripts_deployment path"),
+        )
+        .get_matches();
+
+    let interval = m.value_of("interval").unwrap();
+    let batch = m.value_of("batch").unwrap();
+    let path = m.value_of("account-path").unwrap_or("accounts");
+    let url = m.value_of("url").unwrap_or("localhost");
+    let scripts_deployment_path = m.value_of("scripts_deployment_path").unwrap();
+    Plan::new(
+        interval.parse()?,
+        batch.parse()?,
+        path,
+        url,
+        scripts_deployment_path,
     )
-    .await?;
-    godwoken.check_balance(300).await?;
-    // godwoken.transfer_to_first_empty_account().await?;
-    let account = godwoken
-        .get_account_id_by_short_address("63da2f11825dc79e7f4db47b1c25efa8bb897f0d")
-        .await;
-    log::info!("account: {:?}", account);
+    .await?
+    .run()
+    .await;
+
     Ok(())
 }
