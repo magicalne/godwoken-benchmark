@@ -37,6 +37,12 @@ pub async fn main() -> Result<()> {
                         .short("s")
                         .takes_value(true)
                         .help("scripts_deployment path"),
+                )
+                .arg(
+                    Arg::with_name("rollup_type_hash")
+                        .short("h")
+                        .takes_value(true)
+                        .help("Rollup type hash"),
                 ),
         )
         .subcommand(
@@ -54,6 +60,7 @@ pub async fn main() -> Result<()> {
         let batch = m.value_of("batch").unwrap();
         let path = m.value_of("account-path").unwrap_or("accounts");
         let url = m.value_of("url").unwrap_or("localhost");
+        let rollup_type_hash = m.value_of("rollup_type_hash").unwrap();
         let scripts_deployment_path = m.value_of("scripts_deployment_path").unwrap();
         Plan::new(
             interval.parse()?,
@@ -61,6 +68,7 @@ pub async fn main() -> Result<()> {
             path,
             url,
             scripts_deployment_path,
+            rollup_type_hash.to_string(),
         )
         .await?
         .run()
