@@ -180,7 +180,7 @@ async fn send_batch(
     let rpc_client = GodwokenRpcClient::new(url);
     stream::iter(trans)
         .for_each(|t| {
-            log::debug!("transfer info: {:?}", &t);
+            log::trace!("transfer info: {:?}", &t);
             let mut rpc_client = rpc_client.clone();
             let scripts_deployment = scripts_deployment.clone();
             let callback = callback.clone();
@@ -192,7 +192,8 @@ async fn send_batch(
                     &scripts_deployment,
                     rollup_type_hash,
                     callback,
-                );
+                )
+                .await;
             }
         })
         .await;
