@@ -315,13 +315,30 @@ impl TxStatsCollector {
     }
 }
 
-#[derive(Debug)]
 struct Stats {
     start_ts: Instant,
     success: usize,
     failure: usize,
     timeout: usize,
     committed: usize,
+}
+
+impl fmt::Debug for Stats {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let pendnig = self.success + self.failure - self.timeout - self.committed;
+        write!(
+            f,
+            "elapsed: {:?} 
+         http success: {}, http failure: {}, 
+         timeout: {}, committed: {}, pending: {}",
+            self.start_ts.elapsed().as_secs(),
+            self.success,
+            self.failure,
+            self.timeout,
+            self.committed,
+            pendnig
+        )
+    }
 }
 
 impl Stats {
@@ -336,7 +353,6 @@ impl Stats {
     }
 
     async fn run(&mut self, mut receiver: Receiver<TxStatus>) {
-        log::info!("Start stats");
         let mut timer = Instant::now();
         while let Some(tx_status) = &mut receiver.recv().await {
             log::trace!("recv tx status: {:?}", tx_status);
@@ -376,7 +392,6 @@ pub async fn check_gw_balance(
 }
 
 async fn refresh_receipt(url: reqwest::Url, tx: H256, ts: Instant, sender: Sender<TxStatus>) {
-    log::info!("Starting refresh_receipt");
     let mut interval = tokio::time::interval(Duration::from_secs(5));
     let mut rpc_client = GodwokenRpcClient::new(url);
     loop {
