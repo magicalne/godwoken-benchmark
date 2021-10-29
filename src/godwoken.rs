@@ -64,20 +64,22 @@ impl Plan {
                     .await
                     {
                         log::info!("pk: {:?} balance: {:?}", hex::encode(&pk), balance);
-                        if balance > 100 {
-                            pks.push(pk);
-                        }
+                        // if balance > 100 {
+                        pks.push(pk);
+                        // }
                     }
                 }
             }
         }
         let (callback_sender, callback_receiver) = mpsc::channel(200);
         let (tx_status_sender, tx_status_receiver) = mpsc::channel(200);
+        log::info!("spawn stats");
         tokio::spawn(async move {
             let mut stats = Stats::new();
             stats.run(tx_status_receiver).await;
         });
 
+        log::info!("spawn tx stats collector");
         let url = url_.clone();
         tokio::spawn(async move {
             TxStatsCollector::new(callback_receiver, tx_status_sender, url)
@@ -99,6 +101,7 @@ impl Plan {
 
     pub async fn run(&mut self) {
         let mut now = Instant::now();
+        log::info!("Start to run");
         loop {
             if now.elapsed().as_millis() < self.interval {
                 continue;
@@ -236,7 +239,11 @@ async fn send_req(
         .build();
 
     let bytes = JsonBytes::from_bytes(l2_transaction.as_bytes());
+
+    let _ = rpc_client.execute_l2transaction(bytes.clone()).await;
+
     let res = rpc_client.submit_l2transaction(bytes).await;
+
     let _ = callback
         .send(CallbackMsg {
             tx: res.ok(),
