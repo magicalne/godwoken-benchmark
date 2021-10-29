@@ -148,7 +148,6 @@ impl Plan {
     }
 }
 
-#[derive(Debug)]
 struct TransferInfo {
     pk_from: H256,
     pk_to: H256,
@@ -157,7 +156,7 @@ struct TransferInfo {
     sudt_id: u32,
 }
 
-impl fmt::Display for TransferInfo {
+impl fmt::Debug for TransferInfo {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -259,9 +258,10 @@ async fn send_req(
 
     let bytes = JsonBytes::from_bytes(l2_transaction.as_bytes());
 
-    let _ = rpc_client.execute_l2transaction(bytes.clone()).await;
-
+    let res = rpc_client.execute_l2transaction(bytes.clone()).await;
+    log::debug!("execute res: {:?}", &res);
     let res = rpc_client.submit_l2transaction(bytes).await;
+    log::debug!("submit res: {:?}", &res);
 
     let _ = callback
         .send(CallbackMsg {
