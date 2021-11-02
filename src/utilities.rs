@@ -42,6 +42,7 @@ macro_rules! impl_conversion_for_option_pack {
 //     };
 // }
 
+#[allow(unused_macros)]
 macro_rules! impl_conversion_for_vector_pack {
     ($original:ty, $entity:ident) => {
         impl Pack<packed::$entity> for [$original] {
@@ -54,6 +55,7 @@ macro_rules! impl_conversion_for_vector_pack {
     };
 }
 
+#[allow(unused_macros)]
 macro_rules! impl_conversion_for_vector_unpack {
     ($original:ty, $entity:ident, $reader:ident) => {
         impl<'r> Unpack<Vec<$original>> for packed::$reader<'r> {
@@ -65,6 +67,7 @@ macro_rules! impl_conversion_for_vector_unpack {
     };
 }
 
+#[allow(unused_macros)]
 macro_rules! impl_conversion_for_vector {
     ($original:ty, $entity:ident, $reader:ident) => {
         impl_conversion_for_vector_pack!($original, $entity);
@@ -72,6 +75,7 @@ macro_rules! impl_conversion_for_vector {
     };
 }
 
+#[allow(unused_macros)]
 macro_rules! impl_conversion_for_packed_optional_pack {
     ($original:ident, $entity:ident) => {
         impl Pack<packed::$entity> for Option<packed::$original> {
@@ -86,6 +90,7 @@ macro_rules! impl_conversion_for_packed_optional_pack {
     };
 }
 
+#[allow(unused_macros)]
 macro_rules! impl_conversion_for_packed_iterator_pack {
     ($item:ident, $vec:ident) => {
         impl<T> PackVec<packed::$vec, packed::$item> for T

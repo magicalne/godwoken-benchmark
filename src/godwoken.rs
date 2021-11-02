@@ -260,8 +260,8 @@ async fn send_req(
 
     let bytes = JsonBytes::from_bytes(l2_transaction.as_bytes());
 
-    let res = rpc_client.execute_l2transaction(bytes.clone()).await;
-    log::debug!("execute res: {:?}", &res);
+    // let res = rpc_client.execute_l2transaction(bytes.clone()).await;
+    // log::debug!("execute res: {:?}", &res);
     let res = rpc_client.submit_l2transaction(bytes).await;
     log::debug!("submit res: {:?}", &res);
 
@@ -276,7 +276,6 @@ async fn send_req(
 
 struct TxStatsCollector {
     receiver: Receiver<CallbackMsg>,
-    ts: time::Instant,
     url: reqwest::Url,
     receipt_callback: Sender<TxStatus>,
 }
@@ -289,7 +288,6 @@ impl TxStatsCollector {
     ) -> Self {
         Self {
             receiver,
-            ts: time::Instant::now(),
             receipt_callback,
             url,
         }

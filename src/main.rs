@@ -1,6 +1,6 @@
 use anyhow::Result;
 use clap::{App, Arg, SubCommand};
-use godwoken_stress_test::{godwoken::Plan, utils};
+use godwoken_benchmark::{benchmark, utils};
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 200)]
 pub async fn main() -> Result<()> {
@@ -62,7 +62,7 @@ pub async fn main() -> Result<()> {
         let url = m.value_of("url").unwrap_or("localhost");
         let rollup_type_hash = m.value_of("rollup_type_hash").unwrap();
         let scripts_deployment_path = m.value_of("scripts_deployment_path").unwrap();
-        Plan::new(
+        benchmark::run(
             interval.parse()?,
             batch.parse()?,
             path,
@@ -70,9 +70,7 @@ pub async fn main() -> Result<()> {
             scripts_deployment_path,
             rollup_type_hash.to_string(),
         )
-        .await?
-        .run()
-        .await;
+        .await?;
     }
 
     if let Some(m) = m.subcommand_matches("privkey-to-eth-addr") {
