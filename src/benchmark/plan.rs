@@ -103,11 +103,11 @@ impl Plan {
     pub async fn run(&mut self) {
         log::info!("Plan running...");
         let req_freq = Duration::from_millis(self.interval);
+        let mut interval = time::interval(req_freq);
         //print stats every 10s
         let mut timer = Instant::now();
 
         loop {
-            time::interval(req_freq).tick().await;
             if let Some(pks) = self.next_batch() {
                 log::debug!("run next batch: {} requests", pks.len());
                 let batch_handler = self.batch_handler.clone();
@@ -136,6 +136,7 @@ impl Plan {
                 self.stats.timeout += timeout;
                 self.stats.committed += committed;
             }
+            interval.tick().await;
             if timer.elapsed().as_secs() >= 10 {
                 self.stats();
                 timer = Instant::now();
