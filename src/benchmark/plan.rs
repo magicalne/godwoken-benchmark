@@ -119,7 +119,7 @@ impl Plan {
                 log::warn!("All privkeys are used in txs!");
             }
 
-            if let Some(msg) = self.batch_res_receiver.recv().await {
+            if let Ok(msg) = self.batch_res_receiver.try_recv() {
                 log::debug!("receive batch responses: {}", &msg.pk_idx_vec.len());
                 for pk_idx in msg.pk_idx_vec {
                     if let Some((_, avali)) = self.pks.get_mut(pk_idx) {
