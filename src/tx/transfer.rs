@@ -181,6 +181,7 @@ async fn build_transfer_req(
     let from_id = from_id.unwrap();
 
     let nonce = rpc_client.get_nonce(from_id).await?;
+    log::debug!("build tx req for account: {} nonce: {}", &from_id, &nonce);
 
     let sudt_transfer = SUDTTransfer::new_builder()
         .to(GwPack::pack(&to_address))
