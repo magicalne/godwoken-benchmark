@@ -70,6 +70,7 @@ impl TransferActor {
             };
 
             if let Ok(tx) = rpc_client.submit_l2transaction(bytes).await {
+                log::debug!("submit tx: {}", hex::encode(&tx));
                 match wait_receipt(&tx, &mut rpc_client).await {
                     Ok(_) => {
                         let _ = sender.send(TxStatus::Committed(Some(tx)));
@@ -223,6 +224,7 @@ async fn wait_receipt(tx: &H256, rpc_client: &mut GodwokenRpcClient) -> Result<(
         if let Ok(res) = rpc_client.get_transaction_receipt(tx).await {
             match res {
                 Some(_) => {
+                    log::debug!("committed tx: {}", hex::encode(tx));
                     return Ok(());
                 }
                 None => {
