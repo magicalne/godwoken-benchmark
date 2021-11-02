@@ -85,6 +85,8 @@ impl BatchActor {
                         stats
                     },
                 );
+
+            log::debug!("batch run finished, stats: {:?}", &stats);
             let pk_idx_vec = pks.into_iter().map(|pk| pk.idx).collect();
             let msg = BatchResMsg { stats, pk_idx_vec };
             let _ = batch_res_sender.send(msg).await;

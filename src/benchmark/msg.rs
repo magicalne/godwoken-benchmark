@@ -18,6 +18,7 @@ pub struct BatchResMsg {
     pub stats: Stats,
 }
 
+#[derive(Debug)]
 pub struct Stats {
     pub timeout: usize,
     pub failure: usize,
