@@ -1,4 +1,7 @@
-use std::time::{Duration, Instant};
+use std::{
+    collections::HashMap,
+    time::{Duration, Instant},
+};
 
 use ckb_fixed_hash::H256;
 
@@ -64,9 +67,9 @@ impl Plan {
         batch_handler: BatchHandler,
         batch_res_receiver: mpsc::Receiver<BatchResMsg>,
     ) -> Self {
-        let mut pks = Vec::new();
+        let mut pk_map = HashMap::new();
         for pk in pks_.into_iter() {
-            if let Ok(balance) = check_gw_balance(
+            if let Ok((Some(account_id), balance)) = check_gw_balance(
                 &pk,
                 gw_config.url.clone(),
                 &gw_config.scripts_deployment,
@@ -75,10 +78,11 @@ impl Plan {
             .await
             {
                 if balance > 100 {
-                    pks.push((pk, Some(())));
+                    pk_map.insert(account_id, (pk, Some(())));
                 }
             }
         }
+        let pks: Vec<(H256, Option<()>)> = pk_map.into_values().collect();
         log::info!("Valid accounts: {}", pks.len());
         let stats = Stats {
             timeout: 0,
@@ -186,10 +190,11 @@ pub async fn check_gw_balance(
     url: reqwest::Url,
     scripts_deployment: &ScriptsDeploymentResult,
     rollup_type_hash: &H256,
-) -> Result<u128> {
-    let addr = utils::privkey_to_short_address(pk, rollup_type_hash, scripts_deployment)?;
-    log::info!("short address: {}", hex::encode(&addr));
-    let addr = JsonBytes::from_bytes(addr);
+) -> Result<(Option<u32>, u128)> {
     let mut rpc_client = GodwokenRpcClient::new(url);
-    rpc_client.get_balance(addr, 1).await
+    let short_address = utils::privkey_to_short_address(pk, rollup_type_hash, scripts_deployment)?;
+    let account_id = utils::short_address_to_account_id(&mut rpc_client, &short_address).await?;
+    let short_address = JsonBytes::from_bytes(short_address);
+    let balance = rpc_client.get_balance(short_address, 1).await?;
+    Ok((account_id, balance))
 }
