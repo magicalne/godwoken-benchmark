@@ -49,10 +49,11 @@ impl TransferActor {
     }
 
     fn handle_submit_msg(&self, tx_info: TransferInfo, sender: oneshot::Sender<TxStatus>) {
-        let mut rpc_client = GodwokenRpcClient::new(self.url.clone());
         let rollup_type_hash = self.rollup_type_hash.clone();
         let scripts_deployment = self.scripts_deployment.clone();
+        let url = self.url.clone();
         tokio::spawn(async move {
+            let mut rpc_client = GodwokenRpcClient::new(url);
             let bytes = match build_transfer_req(
                 tx_info,
                 &mut rpc_client,
@@ -87,10 +88,11 @@ impl TransferActor {
     }
 
     fn handle_execute_msg(&self, tx_info: TransferInfo, sender: oneshot::Sender<TxStatus>) {
-        let mut rpc_client = GodwokenRpcClient::new(self.url.clone());
         let rollup_type_hash = self.rollup_type_hash.clone();
         let scripts_deployment = self.scripts_deployment.clone();
+        let url = self.url.clone();
         tokio::spawn(async move {
+            let mut rpc_client = GodwokenRpcClient::new(url);
             let bytes = match build_transfer_req(
                 tx_info,
                 &mut rpc_client,
@@ -133,7 +135,7 @@ impl TransferHandler {
         rollup_type_hash: H256,
         scripts_deployment: ScriptsDeploymentResult,
     ) -> Self {
-        let (sender, receiver) = mpsc::channel(2000);
+        let (sender, receiver) = mpsc::channel(200);
         let actor = TransferActor::new(url, rollup_type_hash, scripts_deployment, receiver);
 
         tokio::spawn(transfer_handler(actor));
