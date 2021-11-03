@@ -75,18 +75,22 @@ impl TransferActor {
                 }
             };
 
-            if let Ok(tx) = rpc_client.submit_l2transaction(bytes).await {
-                log::debug!("submit tx: {}", hex::encode(&tx));
-                match wait_receipt(&tx, &mut rpc_client, timeout).await {
-                    Ok(_) => {
-                        let _ = sender.send(TxStatus::Committed(Some(tx)));
-                    }
-                    Err(_) => {
-                        let _ = sender.send(TxStatus::Timeout(tx));
-                    }
-                };
-            } else {
-                let _ = sender.send(TxStatus::Failure);
+            match rpc_client.submit_l2transaction(bytes).await {
+                Ok(tx) => {
+                    log::debug!("submit tx: {}", hex::encode(&tx));
+                    match wait_receipt(&tx, &mut rpc_client, timeout).await {
+                        Ok(_) => {
+                            let _ = sender.send(TxStatus::Committed(Some(tx)));
+                        }
+                        Err(_) => {
+                            let _ = sender.send(TxStatus::Timeout(tx));
+                        }
+                    };
+                }
+                Err(err) => {
+                    log::trace!("submit l2 tx with error: {:?}", err);
+                    let _ = sender.send(TxStatus::Failure);
+                }
             }
         });
     }
