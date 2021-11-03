@@ -78,6 +78,7 @@ impl Plan {
             .await
             {
                 if balance > 100 {
+                    log::trace!("account: {}, balance: {}", &account_id, &balance);
                     pk_map.insert(account_id, (pk, Some(())));
                 }
             }
