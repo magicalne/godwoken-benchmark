@@ -21,6 +21,13 @@ pub async fn main() -> Result<()> {
                         .help("batch"),
                 )
                 .arg(
+                    Arg::with_name("timeout")
+                        .short("t")
+                        .takes_value(true)
+                        .default_value("120")
+                        .help("tiemout in second"),
+                )
+                .arg(
                     Arg::with_name("account-path")
                         .short("p")
                         .takes_value(true)
@@ -58,6 +65,7 @@ pub async fn main() -> Result<()> {
     if let Some(m) = m.subcommand_matches("run") {
         let interval = m.value_of("interval").unwrap();
         let batch = m.value_of("batch").unwrap();
+        let timeout = m.value_of("timeout").unwrap();
         let path = m.value_of("account-path").unwrap_or("accounts");
         let url = m.value_of("url").unwrap_or("localhost");
         let rollup_type_hash = m.value_of("rollup_type_hash").unwrap();
@@ -65,6 +73,7 @@ pub async fn main() -> Result<()> {
         benchmark::run(
             interval.parse()?,
             batch.parse()?,
+            timeout.parse()?,
             path,
             url,
             scripts_deployment_path,

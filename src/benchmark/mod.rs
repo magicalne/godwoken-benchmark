@@ -20,6 +20,7 @@ use self::plan::GodwokenConfig;
 pub async fn run(
     interval: u64,
     req_batch_cnt: usize,
+    timeout: u64,
     accounts_path: impl AsRef<Path>,
     url: &str,
     scripts_deployment_path: impl AsRef<Path>,
@@ -41,6 +42,7 @@ pub async fn run(
     }
 
     let transfer_handler = crate::tx::transfer::TransferHandler::new(
+        timeout,
         url.clone(),
         rollup_type_hash.clone(),
         scripts_deployment.clone(),

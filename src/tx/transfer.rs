@@ -24,16 +24,19 @@ pub struct TransferActor {
     receiver: mpsc::Receiver<TransferMsg>,
     scripts_deployment: ScriptsDeploymentResult,
     rollup_type_hash: H256,
+    timeout: u64,
 }
 
 impl TransferActor {
     pub fn new(
+        timeout: u64,
         url: Url,
         rollup_type_hash: H256,
         scripts_deployment: ScriptsDeploymentResult,
         receiver: mpsc::Receiver<TransferMsg>,
     ) -> Self {
         Self {
+            timeout,
             url,
             rollup_type_hash,
             scripts_deployment,
@@ -52,6 +55,7 @@ impl TransferActor {
         let rollup_type_hash = self.rollup_type_hash.clone();
         let scripts_deployment = self.scripts_deployment.clone();
         let url = self.url.clone();
+        let timeout = self.timeout;
         tokio::spawn(async move {
             let mut rpc_client = GodwokenRpcClient::new(url);
             let bytes = match build_transfer_req(
@@ -73,7 +77,7 @@ impl TransferActor {
 
             if let Ok(tx) = rpc_client.submit_l2transaction(bytes).await {
                 log::debug!("submit tx: {}", hex::encode(&tx));
-                match wait_receipt(&tx, &mut rpc_client).await {
+                match wait_receipt(&tx, &mut rpc_client, timeout).await {
                     Ok(_) => {
                         let _ = sender.send(TxStatus::Committed(Some(tx)));
                     }
@@ -131,12 +135,14 @@ pub struct TransferHandler {
 
 impl TransferHandler {
     pub fn new(
+        timeout: u64,
         url: Url,
         rollup_type_hash: H256,
         scripts_deployment: ScriptsDeploymentResult,
     ) -> Self {
         let (sender, receiver) = mpsc::channel(200);
-        let actor = TransferActor::new(url, rollup_type_hash, scripts_deployment, receiver);
+        let actor =
+            TransferActor::new(timeout, url, rollup_type_hash, scripts_deployment, receiver);
 
         tokio::spawn(transfer_handler(actor));
 
@@ -219,7 +225,7 @@ async fn build_transfer_req(
         .build())
 }
 
-async fn wait_receipt(tx: &H256, rpc_client: &mut GodwokenRpcClient) -> Result<()> {
+async fn wait_receipt(tx: &H256, rpc_client: &mut GodwokenRpcClient, timeout: u64) -> Result<()> {
     let ts = Instant::now();
     let mut interval = tokio::time::interval(Duration::from_secs(5));
     loop {
@@ -231,7 +237,7 @@ async fn wait_receipt(tx: &H256, rpc_client: &mut GodwokenRpcClient) -> Result<(
                     return Ok(());
                 }
                 None => {
-                    if ts.elapsed().as_secs() > 120 {
+                    if ts.elapsed().as_secs() > timeout {
                         return Err(anyhow!("Wait receipt timeout"));
                     }
                 }
