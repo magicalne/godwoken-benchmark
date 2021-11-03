@@ -63,7 +63,8 @@ impl TransferActor {
             .map(|req| JsonBytes::from_bytes(req.as_bytes()))
             {
                 Ok(req) => req,
-                Err(_) => {
+                Err(err) => {
+                    log::trace!("build request error: {:?}", err);
                     let _ = sender.send(TxStatus::Failure);
                     return;
                 }
