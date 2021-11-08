@@ -22,5 +22,6 @@ pub struct BatchResMsg {
 pub struct Stats {
     pub timeout: usize,
     pub failure: usize,
+    pub pending_commit: usize,
     pub committed: usize,
 }

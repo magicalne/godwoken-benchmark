@@ -42,3 +42,15 @@ impl Pack<packed::Bytes> for Bytes {
         packed::Bytes::new_unchecked(Bytes::from(vec))
     }
 }
+
+impl<'r> Unpack<Bytes> for packed::BytesReader<'r> {
+    fn unpack(&self) -> Bytes {
+        Bytes::from(self.raw_data().to_vec())
+    }
+}
+
+impl Unpack<Bytes> for packed::Bytes {
+    fn unpack(&self) -> Bytes {
+        self.raw_data()
+    }
+}

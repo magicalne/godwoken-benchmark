@@ -67,20 +67,30 @@ impl BatchActor {
             let stats = join_all(futures)
                 .await
                 .into_iter()
-                .filter(|res: &Result<TxStatus>| res.is_ok())
+                .filter(|res: &Result<(TxStatus, Option<TxStatus>)>| res.is_ok())
                 .fold(
                     Stats {
                         timeout: 0,
                         failure: 0,
                         committed: 0,
+                        pending_commit: 0,
                     },
                     |mut stats, res| -> Stats {
-                        if let Ok(status) = res {
-                            match status {
+                        if let Ok((gw_status, commit_status)) = res {
+                            match gw_status {
                                 TxStatus::Failure => stats.failure += 1,
                                 TxStatus::Committed(_) => stats.committed += 1,
                                 TxStatus::Timeout(_) => stats.timeout += 1,
+                                TxStatus::PendingCommit => stats.pending_commit += 1,
                             };
+                            if let Some(commit_status) = commit_status {
+                                match commit_status {
+                                    TxStatus::Failure => stats.failure += 1,
+                                    TxStatus::Committed(_) => stats.committed += 1,
+                                    TxStatus::Timeout(_) => stats.timeout += 1,
+                                    TxStatus::PendingCommit => stats.pending_commit += 1,
+                                };
+                            }
                         }
                         stats
                     },

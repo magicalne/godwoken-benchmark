@@ -8,7 +8,7 @@ use ckb_types::H256;
 // };
 use std::{io::ErrorKind, u128, u32};
 
-use super::types::{RunResult, TxReceipt};
+use super::types::{L2TransactionWithStatus, RunResult, TxReceipt};
 
 type AccountID = Uint32;
 
@@ -114,6 +114,16 @@ impl GodwokenRpcClient {
     //     self.rpc::<RunResult>("execute_raw_l2transaction", params)
     //         .map(Into::into)
     // }
+
+    pub async fn get_transaction(
+        &mut self,
+        tx_hash: &H256,
+    ) -> Result<Option<L2TransactionWithStatus>> {
+        let params = serde_json::to_value((tx_hash,))?;
+        self.rpc::<Option<L2TransactionWithStatus>>("get_transaction", params)
+            .await
+            .map(|opt| opt.map(Into::into))
+    }
 
     pub async fn get_transaction_receipt(&mut self, tx_hash: &H256) -> Result<Option<TxReceipt>> {
         let params = serde_json::to_value((tx_hash,))?;

@@ -185,6 +185,12 @@ impl CkbHasher {
     }
 }
 
+impl Default for CkbHasher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub struct EthHasher {
     hasher: Keccak256,
 }
@@ -206,6 +212,12 @@ impl EthHasher {
         let mut result = [0u8; 32];
         result.copy_from_slice(&buf[..]);
         result.into()
+    }
+}
+
+impl Default for EthHasher {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

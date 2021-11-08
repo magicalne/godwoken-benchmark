@@ -9,7 +9,7 @@ use reqwest::Url;
 use tokio::sync::mpsc::{self, Sender};
 
 use crate::{
-    api::godwoken_rpc::GodwokenRpcClient,
+    api::{godwoken_rpc::GodwokenRpcClient, types::L2TransactionStatus},
     generated::packed::{L2Transaction, RawL2Transaction, SUDTArgs, SUDTTransfer},
     prelude::Pack as GwPack,
     tx::msg::TxStatus,
@@ -46,12 +46,21 @@ impl TransferActor {
 
     fn handle_msg(&self, msg: TransferMsg) {
         match msg {
-            TransferMsg::Submit(tx_info, sender) => self.handle_submit_msg(tx_info, sender),
+            TransferMsg::Submit {
+                tx_info,
+                gw_status,
+                commit_status,
+            } => self.handle_submit_msg(tx_info, gw_status, commit_status),
             TransferMsg::Execute(tx_info, sender) => self.handle_execute_msg(tx_info, sender),
         }
     }
 
-    fn handle_submit_msg(&self, tx_info: TransferInfo, sender: oneshot::Sender<TxStatus>) {
+    fn handle_submit_msg(
+        &self,
+        tx_info: TransferInfo,
+        gw_status: oneshot::Sender<TxStatus>,
+        commit_status: oneshot::Sender<TxStatus>,
+    ) {
         let rollup_type_hash = self.rollup_type_hash.clone();
         let scripts_deployment = self.scripts_deployment.clone();
         let url = self.url.clone();
@@ -70,7 +79,7 @@ impl TransferActor {
                 Ok(req) => req,
                 Err(err) => {
                     log::trace!("build request error: {:?}", err);
-                    let _ = sender.send(TxStatus::Failure);
+                    let _ = gw_status.send(TxStatus::Failure);
                     return;
                 }
             };
@@ -80,16 +89,24 @@ impl TransferActor {
                     log::debug!("submit tx: {}", hex::encode(&tx));
                     match wait_receipt(&tx, &mut rpc_client, timeout).await {
                         Ok(_) => {
-                            let _ = sender.send(TxStatus::Committed(Some(tx)));
+                            let _ = gw_status.send(TxStatus::PendingCommit);
+                            match wait_committed(&tx, &mut rpc_client, timeout).await {
+                                Ok(_) => {
+                                    let _ = commit_status.send(TxStatus::Committed(Some(tx)));
+                                }
+                                Err(_) => {
+                                    let _ = commit_status.send(TxStatus::Failure);
+                                }
+                            };
                         }
                         Err(_) => {
-                            let _ = sender.send(TxStatus::Timeout(tx));
+                            let _ = gw_status.send(TxStatus::Timeout(tx));
                         }
                     };
                 }
                 Err(err) => {
                     log::trace!("submit l2 tx with error: {:?}", err);
-                    let _ = sender.send(TxStatus::Failure);
+                    let _ = gw_status.send(TxStatus::Failure);
                 }
             }
         });
@@ -153,20 +170,32 @@ impl TransferHandler {
         Self { sender }
     }
 
-    pub async fn submit(&self, tx_info: TransferInfo) -> Result<TxStatus> {
-        let (send, recv) = oneshot::channel();
-        let msg = TransferMsg::Submit(tx_info, send);
+    // The return value is a two-stage-tuple of status.
+    // First status is receipt status.
+    // Second is Layer1 commit status.
+    pub async fn submit(&self, tx_info: TransferInfo) -> Result<(TxStatus, Option<TxStatus>)> {
+        let (gw_status, gw_recv) = oneshot::channel();
+        let (commit_status, commit_recv) = oneshot::channel();
+        let msg = TransferMsg::Submit {
+            tx_info,
+            gw_status,
+            commit_status,
+        };
         let _ = self.sender.send(msg).await;
-        let tx_status = recv.await?;
-        Ok(tx_status)
+        let gw_status = gw_recv.await?;
+        let commit_status = match &gw_status {
+            TxStatus::Failure => None,
+            _ => Some(commit_recv.await?),
+        };
+        Ok((gw_status, commit_status))
     }
 
-    pub async fn execute(&self, tx_info: TransferInfo) -> Result<TxStatus> {
+    pub async fn execute(&self, tx_info: TransferInfo) -> Result<(TxStatus, Option<TxStatus>)> {
         let (send, recv) = oneshot::channel();
         let msg = TransferMsg::Execute(tx_info, send);
         let _ = self.sender.send(msg).await;
         let tx_status = recv.await?;
-        Ok(tx_status)
+        Ok((tx_status, None))
     }
 }
 
@@ -246,6 +275,22 @@ async fn wait_receipt(tx: &H256, rpc_client: &mut GodwokenRpcClient, timeout: u6
                     }
                 }
             }
+        }
+    }
+}
+
+async fn wait_committed(tx: &H256, rpc_client: &mut GodwokenRpcClient, timeout: u64) -> Result<()> {
+    let ts = Instant::now();
+    let mut interval = tokio::time::interval(Duration::from_secs(5));
+    loop {
+        interval.tick().await;
+        if let Ok(Some(tx_status)) = rpc_client.get_transaction(tx).await {
+            if tx_status.status == L2TransactionStatus::Committed {
+                return Ok(());
+            }
+        }
+        if ts.elapsed().as_secs() > timeout {
+            return Err(anyhow!("Wait committed timeout"));
         }
     }
 }

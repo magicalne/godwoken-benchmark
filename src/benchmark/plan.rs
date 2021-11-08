@@ -88,6 +88,7 @@ impl Plan {
         let stats = Stats {
             timeout: 0,
             failure: 0,
+            pending_commit: 0,
             committed: 0,
         };
         Self {
@@ -131,10 +132,12 @@ impl Plan {
                 let Stats {
                     failure,
                     timeout,
+                    pending_commit,
                     committed,
                 } = msg.stats;
                 self.stats.failure += failure;
                 self.stats.timeout += timeout;
+                self.stats.pending_commit += pending_commit;
                 self.stats.committed += committed;
             }
             interval.tick().await;
@@ -172,16 +175,23 @@ impl Plan {
         let Stats {
             failure,
             timeout,
+            pending_commit,
             committed,
         } = self.stats;
         let elapsed = self.ts.elapsed().as_secs();
+        let pending_tps = pending_commit as f32 / (elapsed as f32);
         let tps = committed as f32 / (elapsed as f32);
         log::info!(
-            "Stats -- for last {}s failure: {}, timeout: {}, committed: {}, tps: {}",
+            "Stats -- for last {}s 
+            failure: {}, timeout: {},
+            pending: {}, committed: {}, 
+            tps(include pending): {}, tps(only committed): {}",
             elapsed,
             failure,
             timeout,
+            pending_commit,
             committed,
+            pending_tps.round(),
             tps.round()
         );
     }
