@@ -95,7 +95,7 @@ impl TransferActor {
                                     let _ = commit_status.send(TxStatus::Committed(Some(tx)));
                                 }
                                 Err(_) => {
-                                    let _ = commit_status.send(TxStatus::Failure);
+                                    let _ = commit_status.send(TxStatus::Timeout(tx));
                                 }
                             };
                         }
