@@ -2,7 +2,6 @@
 pub mod utilities;
 pub mod api;
 pub mod generated;
-pub mod godwoken;
 pub mod benchmark;
 pub mod prelude;
 pub mod primitive;
