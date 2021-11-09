@@ -56,10 +56,6 @@ pub async fn main() -> Result<()> {
             SubCommand::with_name("privkey-to-eth-addr")
                 .arg(Arg::with_name("privkey").short("pk").takes_value(true)),
         )
-        .subcommand(
-            SubCommand::with_name("privkey-to-ckb-addr")
-                .arg(Arg::with_name("privkey").short("pk").takes_value(true)),
-        )
         .get_matches();
 
     if let Some(m) = m.subcommand_matches("run") {

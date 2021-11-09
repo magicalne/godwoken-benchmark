@@ -2,15 +2,25 @@
 
 ## Setup
 
+- kicker
 - ckb and ckb-cli
 - jq
 - gw-tools
+
+### Build
+
+```shell
+cargo install --path .
+```
 
 ## create accounts and deposit ckb
 
 ### import_ckb_account.sh $CKB_URL $GW_URL
 
-./import_ckb_account.sh http://localhost:8114 http://localhost:8119
+```shll
+## ./create_account.sh $KICKER_URL
+./create_account.sh http://localhost:6100
+```
 
 ## run
 
