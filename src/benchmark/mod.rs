@@ -1,21 +1,23 @@
 pub mod batch;
 pub mod msg;
 pub mod plan;
+pub mod stats;
 
 use std::{
     fs::File,
     io::{BufRead, BufReader},
     path::Path,
     str::FromStr,
+    time::Duration,
 };
 
 use anyhow::Result;
 use ckb_fixed_hash::H256;
-use tokio::{fs::read_dir, sync::mpsc};
+use tokio::{fs::read_dir, sync::mpsc, time};
 
 use crate::utils::{read_privkey, read_scripts_deployment};
 
-use self::plan::GodwokenConfig;
+use self::{plan::GodwokenConfig, stats::StatsHandler};
 
 pub async fn run(
     interval: u64,
@@ -41,12 +43,25 @@ pub async fn run(
         }
     }
 
+    let stats_handler = StatsHandler::new();
+
     let transfer_handler = crate::tx::transfer::TransferHandler::new(
         timeout,
         url.clone(),
         rollup_type_hash.clone(),
         scripts_deployment.clone(),
+        stats_handler.clone(),
     );
+
+    tokio::spawn(async move {
+        let mut interval = time::interval(Duration::from_secs(10));
+        loop {
+            interval.tick().await;
+            if let Ok(stats) = stats_handler.get_stats().await {
+                log::info!("stats: {:?}", stats);
+            }
+        }
+    });
 
     let (batch_res_sender, batch_res_receiver) = mpsc::channel(20);
     let batch_handler = batch::BatchHandler::new(transfer_handler, batch_res_sender);

@@ -4,12 +4,8 @@ use ckb_fixed_hash::H256;
 use futures::channel::oneshot;
 
 pub enum TransferMsg {
-    Submit {
-        tx_info: TransferInfo,
-        gw_status: oneshot::Sender<TxStatus>,
-        commit_status: oneshot::Sender<TxStatus>,
-    },
-    Execute(TransferInfo, oneshot::Sender<TxStatus>),
+    Execute(TransferInfo, oneshot::Sender<()>),
+    Submit(TransferInfo, oneshot::Sender<()>),
 }
 pub struct TransferInfo {
     pub pk_from: H256,

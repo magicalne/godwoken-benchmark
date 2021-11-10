@@ -1057,6 +1057,7 @@ dependencies = [
  "lazy_static",
  "log",
  "molecule",
+ "rand 0.8.4",
  "reqwest",
  "secp256k1 0.20.3",
  "serde",

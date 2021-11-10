@@ -1,3 +1,9 @@
+use std::time::Duration;
+
+use tokio::sync::oneshot;
+
+use crate::tx::msg::TxStatus;
+
 use super::plan::Privkey;
 
 pub struct BatchReqMsg {
@@ -15,7 +21,6 @@ pub enum ReqMethod {
 
 pub struct BatchResMsg {
     pub pk_idx_vec: Vec<usize>,
-    pub stats: Stats,
 }
 
 #[derive(Debug)]
@@ -24,4 +29,19 @@ pub struct Stats {
     pub failure: usize,
     pub pending_commit: usize,
     pub committed: usize,
+}
+
+pub enum ApiStatus {
+    Success,
+    Failure,
+}
+
+pub enum StatsReqMsg {
+    SendApiStatus {
+        api: String,
+        duration: Duration,
+        status: ApiStatus,
+    },
+    SendTxStatus(TxStatus),
+    Get(oneshot::Sender<crate::benchmark::stats::Stats>),
 }

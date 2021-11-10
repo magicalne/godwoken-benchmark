@@ -1,14 +1,10 @@
-use anyhow::Result;
 use futures::future::join_all;
 use tokio::sync::mpsc;
 
-use crate::tx::{
-    msg::{TransferInfo, TxStatus},
-    transfer::TransferHandler,
-};
+use crate::tx::{msg::TransferInfo, transfer::TransferHandler};
 
 use super::{
-    msg::{BatchReqMsg, BatchResMsg, ReqMethod, Stats},
+    msg::{BatchReqMsg, BatchResMsg, ReqMethod},
     plan::Privkey,
 };
 
@@ -59,46 +55,18 @@ impl BatchActor {
                 })
                 .map(|t| async {
                     match method {
-                        ReqMethod::Submit => tx_handler.submit(t).await,
-                        ReqMethod::Execute => tx_handler.execute(t).await,
-                    }
+                        ReqMethod::Submit => {
+                            let _ = tx_handler.submit(t).await;
+                        }
+                        ReqMethod::Execute => {
+                            let _ = tx_handler.execute(t).await;
+                        }
+                    };
                 })
                 .collect::<Vec<_>>();
-            let stats = join_all(futures)
-                .await
-                .into_iter()
-                .filter(|res: &Result<(TxStatus, Option<TxStatus>)>| res.is_ok())
-                .fold(
-                    Stats {
-                        timeout: 0,
-                        failure: 0,
-                        committed: 0,
-                        pending_commit: 0,
-                    },
-                    |mut stats, res| -> Stats {
-                        if let Ok((gw_status, commit_status)) = res {
-                            match gw_status {
-                                TxStatus::Failure => stats.failure += 1,
-                                TxStatus::Committed(_) => stats.committed += 1,
-                                TxStatus::Timeout(_) => stats.timeout += 1,
-                                TxStatus::PendingCommit => stats.pending_commit += 1,
-                            };
-                            if let Some(commit_status) = commit_status {
-                                match commit_status {
-                                    TxStatus::Failure => stats.failure += 1,
-                                    TxStatus::Committed(_) => stats.committed += 1,
-                                    TxStatus::Timeout(_) => stats.timeout += 1,
-                                    TxStatus::PendingCommit => stats.pending_commit += 1,
-                                };
-                            }
-                        }
-                        stats
-                    },
-                );
-
-            log::debug!("batch run finished, stats: {:?}", &stats);
+            let _ = join_all(futures).await;
             let pk_idx_vec = pks.into_iter().map(|pk| pk.idx).collect();
-            let msg = BatchResMsg { stats, pk_idx_vec };
+            let msg = BatchResMsg { pk_idx_vec };
             let _ = batch_res_sender.send(msg).await;
         });
     }

@@ -1,19 +1,14 @@
-use std::{
-    collections::HashMap,
-    time::{Duration, Instant},
-};
+use std::{collections::HashMap, time::Duration};
 
 use ckb_fixed_hash::H256;
 
 use anyhow::Result;
 use ckb_jsonrpc_types::JsonBytes;
+use rand::prelude::*;
 use reqwest::Url;
 use tokio::{sync::mpsc, time};
 
-use crate::{
-    api::godwoken_rpc::GodwokenRpcClient, benchmark::msg::Stats, types::ScriptsDeploymentResult,
-    utils,
-};
+use crate::{api::godwoken_rpc::GodwokenRpcClient, types::ScriptsDeploymentResult, utils};
 
 use super::{
     batch::BatchHandler,
@@ -54,8 +49,7 @@ pub struct Plan {
     batch_handler: BatchHandler,
     batch_res_receiver: mpsc::Receiver<BatchResMsg>,
     pks: Vec<(H256, Option<()>)>,
-    stats: Stats,
-    ts: Instant,
+    rng: ThreadRng,
 }
 
 impl Plan {
@@ -85,20 +79,13 @@ impl Plan {
         }
         let pks: Vec<(H256, Option<()>)> = pk_map.into_values().collect();
         log::info!("Valid accounts: {}", pks.len());
-        let stats = Stats {
-            timeout: 0,
-            failure: 0,
-            pending_commit: 0,
-            committed: 0,
-        };
         Self {
-            ts: Instant::now(),
             interval,
             pks,
             req_batch_cnt,
             batch_handler,
             batch_res_receiver,
-            stats,
+            rng: rand::thread_rng(),
         }
     }
 
@@ -106,8 +93,6 @@ impl Plan {
         log::info!("Plan running...");
         let req_freq = Duration::from_millis(self.interval);
         let mut interval = time::interval(req_freq);
-        //print stats every 10s
-        let mut timer = Instant::now();
 
         loop {
             if let Some(pks) = self.next_batch() {
@@ -129,38 +114,27 @@ impl Plan {
                         *avali = Some(())
                     }
                 }
-                let Stats {
-                    failure,
-                    timeout,
-                    pending_commit,
-                    committed,
-                } = msg.stats;
-                self.stats.failure += failure;
-                self.stats.timeout += timeout;
-                self.stats.pending_commit += pending_commit;
-                self.stats.committed += committed;
             }
             interval.tick().await;
-            if timer.elapsed().as_secs() >= 10 {
-                self.stats();
-                timer = Instant::now();
-            }
         }
     }
 
     fn next_batch(&mut self) -> Option<Vec<Privkey>> {
         let mut cnt = 0;
         let mut pks = Vec::new();
-        for (idx, (pk, avail)) in self.pks.iter_mut().enumerate() {
-            if avail.is_some() {
-                *avail = None;
-                pks.push(Privkey {
-                    pk: pk.clone(),
-                    idx,
-                });
-                cnt += 1;
-                if self.req_batch_cnt == cnt {
-                    break;
+        loop {
+            let nxt = self.rng.gen_range(0..self.pks.len());
+            if let Some((pk, avail)) = self.pks.get_mut(nxt) {
+                if avail.is_some() {
+                    *avail = None;
+                    pks.push(Privkey {
+                        pk: pk.clone(),
+                        idx: nxt,
+                    });
+                    cnt += 1;
+                    if self.req_batch_cnt == cnt {
+                        break;
+                    }
                 }
             }
         }
@@ -169,31 +143,6 @@ impl Plan {
         } else {
             Some(pks)
         }
-    }
-
-    fn stats(&self) {
-        let Stats {
-            failure,
-            timeout,
-            pending_commit,
-            committed,
-        } = self.stats;
-        let elapsed = self.ts.elapsed().as_secs();
-        let pending_tps = pending_commit as f32 / (elapsed as f32);
-        let tps = committed as f32 / (elapsed as f32);
-        log::info!(
-            "Stats -- for last {}s 
-            failure: {}, timeout: {},
-            pending: {}, committed: {}, 
-            tps(include pending): {}, tps(only committed): {}",
-            elapsed,
-            failure,
-            timeout,
-            pending_commit,
-            committed,
-            pending_tps.round(),
-            tps.round()
-        );
     }
 }
 
