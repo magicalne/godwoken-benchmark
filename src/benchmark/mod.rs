@@ -58,7 +58,7 @@ pub async fn run(
         loop {
             interval.tick().await;
             if let Ok(stats) = stats_handler.get_stats().await {
-                log::info!("stats: {:?}", stats);
+                log::info!("stats: {:#?}", stats);
             }
         }
     };
