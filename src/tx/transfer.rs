@@ -278,7 +278,7 @@ async fn wait_receipt(tx: &H256, rpc_client: &mut GodwokenRpcClient, timeout: u6
         if let Ok(res) = rpc_client.get_transaction_receipt(tx).await {
             match res {
                 Some(_) => {
-                    log::debug!("committed tx: {}", hex::encode(tx));
+                    log::debug!("pending commit tx: {}", hex::encode(tx));
                     return Ok(());
                 }
                 None => {
@@ -298,6 +298,7 @@ async fn wait_committed(tx: &H256, rpc_client: &mut GodwokenRpcClient, timeout: 
         interval.tick().await;
         if let Ok(Some(tx_status)) = rpc_client.get_transaction(tx).await {
             if tx_status.status == L2TransactionStatus::Committed {
+                log::debug!("committed tx: {}", hex::encode(tx));
                 return Ok(());
             }
         }

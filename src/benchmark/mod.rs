@@ -53,7 +53,7 @@ pub async fn run(
         stats_handler.clone(),
     );
 
-    tokio::spawn(async move {
+    let stats_fut = async move {
         let mut interval = time::interval(Duration::from_secs(10));
         loop {
             interval.tick().await;
@@ -61,7 +61,7 @@ pub async fn run(
                 log::info!("stats: {:?}", stats);
             }
         }
-    });
+    };
 
     let (batch_res_sender, batch_res_receiver) = mpsc::channel(20);
     let batch_handler = batch::BatchHandler::new(transfer_handler, batch_res_sender);
@@ -79,6 +79,7 @@ pub async fn run(
         batch_res_receiver,
     )
     .await;
+    tokio::spawn(stats_fut);
     plan.run().await;
     Ok(())
 }
