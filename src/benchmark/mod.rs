@@ -4,6 +4,7 @@ pub mod plan;
 pub mod stats;
 
 use std::{
+    cmp,
     fs::File,
     io::{BufRead, BufReader},
     path::Path,
@@ -63,7 +64,9 @@ pub async fn run(
         }
     };
 
-    let (batch_res_sender, batch_res_receiver) = mpsc::channel(200);
+    let buffer = cmp::max(pks.len() / req_batch_cnt, 200);
+    log::info!("batch channel buffer: {}", buffer);
+    let (batch_res_sender, batch_res_receiver) = mpsc::channel(buffer);
     let batch_handler = batch::BatchHandler::new(transfer_handler, batch_res_sender);
     let gw_config = GodwokenConfig {
         scripts_deployment,
