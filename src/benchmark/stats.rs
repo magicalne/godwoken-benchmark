@@ -1,6 +1,6 @@
 use anyhow::Result;
 use std::{
-    collections::HashMap,
+    collections::{HashMap, VecDeque},
     time::{Duration, Instant},
 };
 use tokio::sync::{mpsc, oneshot};
@@ -118,7 +118,7 @@ pub struct ApiStats {
     failure: usize,
 }
 struct ApiStatsHandler {
-    vec: Vec<Duration>,
+    deq: VecDeque<Duration>,
     limit: usize,
     max: u128,
     min: u128,
@@ -129,7 +129,7 @@ struct ApiStatsHandler {
 impl ApiStatsHandler {
     fn new(limit: usize) -> Self {
         Self {
-            vec: Vec::new(),
+            deq: VecDeque::new(),
             limit,
             max: 0,
             min: u128::MAX,
@@ -146,9 +146,9 @@ impl ApiStatsHandler {
         if dur_ms < self.min {
             self.min = dur_ms;
         }
-        self.vec.push(duration);
-        if self.vec.len() > self.limit {
-            self.vec.pop();
+        self.deq.push_back(duration);
+        if self.deq.len() > self.limit {
+            self.deq.pop_front();
         }
         match status {
             ApiStatus::Success => self.success += 1,
@@ -158,14 +158,14 @@ impl ApiStatsHandler {
 
     fn stats(&self) -> ApiStats {
         let mut sum = 0;
-        for i in &self.vec {
+        for i in &self.deq {
             let ms = i.as_millis();
             sum += ms;
         }
-        let avg = if self.vec.is_empty() {
+        let avg = if self.deq.is_empty() {
             0f32
         } else {
-            sum as f32 / self.vec.len() as f32
+            sum as f32 / self.deq.len() as f32
         };
         ApiStats {
             min: self.min,
