@@ -64,8 +64,7 @@ impl BatchActor {
                     };
                 })
                 .collect::<Vec<_>>();
-            let sth = join_all(futures).await;
-            log::info!("sth: {:?}", sth);
+            let _ = join_all(futures).await;
             let pk_idx_vec = pks.into_iter().map(|pk| pk.idx).collect();
             let msg = BatchResMsg { pk_idx_vec };
             let _ = batch_res_sender.send(msg).await;

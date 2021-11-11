@@ -76,7 +76,7 @@ impl TransferActor {
             {
                 Ok(req) => req,
                 Err(err) => {
-                    log::trace!("build request error: {:?}", err);
+                    log::error!("build request error: {:?}", err);
                     let _ = sender.send(());
                     let _ = stats_handler.send_tx_stats(TxStatus::Failure).await;
                     return;
