@@ -92,14 +92,14 @@ impl BatchHandler {
         Self { sender }
     }
 
-    pub async fn send_batch(
+    pub fn try_send_batch(
         &self,
         pks: Vec<Privkey>,
         method: ReqMethod,
         amount: u128,
         fee: u128,
         sudt_id: u32,
-    ) {
+    ) -> Result<(), Vec<Privkey>> {
         let msg = BatchReqMsg {
             pks,
             method,
@@ -107,6 +107,9 @@ impl BatchHandler {
             fee,
             sudt_id,
         };
-        let _ = self.sender.send(msg).await;
+        self.sender.try_send(msg).map_err(|err| match err {
+            mpsc::error::TrySendError::Full(msg) => msg.pks,
+            mpsc::error::TrySendError::Closed(msg) => msg.pks,
+        })
     }
 }

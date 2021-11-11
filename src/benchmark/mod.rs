@@ -63,7 +63,7 @@ pub async fn run(
         }
     };
 
-    let (batch_res_sender, batch_res_receiver) = mpsc::channel(20);
+    let (batch_res_sender, batch_res_receiver) = mpsc::channel(200);
     let batch_handler = batch::BatchHandler::new(transfer_handler, batch_res_sender);
     let gw_config = GodwokenConfig {
         scripts_deployment,

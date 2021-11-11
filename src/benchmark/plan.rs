@@ -98,11 +98,13 @@ impl Plan {
             if let Some(pks) = self.next_batch() {
                 log::debug!("run next batch: {} requests", pks.len());
                 let batch_handler = self.batch_handler.clone();
-                tokio::spawn(async move {
-                    batch_handler
-                        .send_batch(pks, ReqMethod::Submit, 100, 1, 1)
-                        .await;
-                });
+                if let Err(pks) = batch_handler.try_send_batch(pks, ReqMethod::Submit, 100, 1, 1) {
+                    for pk in pks {
+                        if let Some((_, avail)) = self.pks.get_mut(pk.idx) {
+                            *avail = Some(())
+                        }
+                    }
+                }
             } else {
                 log::warn!("All privkeys are used in txs!");
             }
