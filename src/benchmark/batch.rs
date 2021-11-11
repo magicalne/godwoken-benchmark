@@ -108,8 +108,14 @@ impl BatchHandler {
             sudt_id,
         };
         self.sender.try_send(msg).map_err(|err| match err {
-            mpsc::error::TrySendError::Full(msg) => msg.pks,
-            mpsc::error::TrySendError::Closed(msg) => msg.pks,
+            mpsc::error::TrySendError::Full(msg) => {
+                log::error!("send batch channel is full");
+                msg.pks
+            }
+            mpsc::error::TrySendError::Closed(msg) => {
+                log::error!("send batch channel is closed");
+                msg.pks
+            }
         })
     }
 }
