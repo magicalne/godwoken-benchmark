@@ -1,4 +1,4 @@
-use std::{collections::HashMap, time::Duration};
+use std::{cmp, collections::HashMap, time::Duration};
 
 use ckb_fixed_hash::H256;
 
@@ -124,6 +124,11 @@ impl Plan {
     fn next_batch(&mut self) -> Option<Vec<Privkey>> {
         let mut cnt = 0;
         let mut pks = Vec::new();
+        let available = self.pks.iter().filter(|(_, a)| a.is_some()).count();
+        if available == 0 {
+            return None;
+        }
+        let batch_cnt = cmp::min(available, self.req_batch_cnt);
         loop {
             let nxt = self.rng.gen_range(0..self.pks.len());
             if let Some((pk, avail)) = self.pks.get_mut(nxt) {
@@ -134,7 +139,7 @@ impl Plan {
                         idx: nxt,
                     });
                     cnt += 1;
-                    if self.req_batch_cnt == cnt {
+                    if batch_cnt == cnt {
                         break;
                     }
                 }
