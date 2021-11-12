@@ -106,7 +106,7 @@ impl TransferActor {
                     };
                 }
                 Err(err) => {
-                    log::trace!("submit l2 tx with error: {:?}", err);
+                    log::error!("submit l2 tx with error: {:?}", err);
                     let _ = stats_handler.send_tx_stats(TxStatus::Failure).await;
                     let _ = stats_handler
                         .send_api_stats(API_SUBMIT_TX.into(), timer.elapsed(), ApiStatus::Failure)
