@@ -288,6 +288,11 @@ async fn wait_committed(tx: &H256, rpc_client: &mut GodwokenRpcClient, timeout: 
     loop {
         interval.tick().await;
         if let Ok(Some(tx_status)) = rpc_client.get_transaction(tx).await {
+            let status = match &tx_status.status {
+                L2TransactionStatus::Pending => "pending",
+                L2TransactionStatus::Committed => "committed",
+            };
+            log::info!("committed tx: {} {}", hex::encode(tx), status);
             if tx_status.status == L2TransactionStatus::Committed {
                 log::debug!("committed tx: {}", hex::encode(tx));
                 return Ok(());
