@@ -93,17 +93,12 @@ impl TransferActor {
                     match wait_receipt(&tx, &mut rpc_client, timeout).await {
                         Ok(_) => {
                             let _ = stats_handler.send_tx_stats(TxStatus::PendingCommit).await;
-                            match wait_committed(&tx, &mut rpc_client, timeout).await {
-                                Ok(_) => {
-                                    let _ = stats_handler
-                                        .send_tx_stats(TxStatus::Committed(Some(tx)))
-                                        .await;
-                                }
-                                Err(_) => {
-                                    let _ =
-                                        stats_handler.send_tx_stats(TxStatus::Timeout(tx)).await;
-                                }
-                            };
+                            spawn_wait_committed_task(
+                                tx.clone(),
+                                stats_handler.clone(),
+                                rpc_client.clone(),
+                                timeout,
+                            );
                         }
                         Err(_) => {
                             let _ = stats_handler
@@ -309,4 +304,24 @@ async fn wait_committed(tx: &H256, rpc_client: &mut GodwokenRpcClient, timeout: 
             return Err(anyhow!("Wait committed timeout"));
         }
     }
+}
+
+fn spawn_wait_committed_task(
+    tx: H256,
+    stats_handler: StatsHandler,
+    mut rpc_client: GodwokenRpcClient,
+    timeout: u64,
+) {
+    tokio::spawn(async move {
+        match wait_committed(&tx, &mut rpc_client, timeout).await {
+            Ok(_) => {
+                let _ = stats_handler
+                    .send_tx_stats(TxStatus::Committed(Some(tx)))
+                    .await;
+            }
+            Err(_) => {
+                let _ = stats_handler.send_tx_stats(TxStatus::Timeout(tx)).await;
+            }
+        };
+    });
 }

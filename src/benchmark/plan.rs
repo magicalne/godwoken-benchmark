@@ -124,26 +124,26 @@ impl Plan {
     fn next_batch(&mut self) -> Option<Vec<Privkey>> {
         let mut cnt = 0;
         let mut pks = Vec::new();
-        let available: Vec<usize> = self
+        let available_idx_vec: Vec<usize> = self
             .pks
             .iter()
             .enumerate()
             .filter(|(_, (_, a))| a.is_some())
             .map(|(idx, _)| idx)
             .collect();
-        if available.is_empty() {
+        if available_idx_vec.is_empty() {
             return None;
         }
-        let batch_cnt = cmp::min(available.len(), self.req_batch_cnt);
+        let batch_cnt = cmp::min(available_idx_vec.len(), self.req_batch_cnt);
         loop {
-            let nxt = self.rng.gen_range(0..available.len());
-            let idx = available.get(nxt).unwrap();
+            let nxt = self.rng.gen_range(0..available_idx_vec.len());
+            let idx = available_idx_vec.get(nxt).unwrap();
             if let Some((pk, avail)) = self.pks.get_mut(*idx) {
                 if avail.is_some() {
                     *avail = None;
                     pks.push(Privkey {
                         pk: pk.clone(),
-                        idx: nxt,
+                        idx: *idx,
                     });
                     cnt += 1;
                     if batch_cnt == cnt {
