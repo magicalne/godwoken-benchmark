@@ -93,10 +93,11 @@ impl Plan {
         log::info!("Plan running...");
         let req_freq = Duration::from_millis(self.interval);
         let mut interval = time::interval(req_freq);
+        let mut wait_pk_interval = time::interval(Duration::from_secs(5));
 
         loop {
             if let Some(pks) = self.next_batch() {
-                log::debug!("run next batch: {} requests", pks.len());
+                log::info!("run next batch: {} requests", pks.len());
                 let batch_handler = self.batch_handler.clone();
                 if let Err(pks) = batch_handler.try_send_batch(pks, ReqMethod::Submit, 100, 1, 1) {
                     for pk in pks {
@@ -107,10 +108,11 @@ impl Plan {
                 }
             } else {
                 log::warn!("All privkeys are used in txs!");
+                wait_pk_interval.tick().await;
             }
 
             if let Ok(msg) = self.batch_res_receiver.try_recv() {
-                log::debug!("receive batch responses: {}", &msg.pk_idx_vec.len());
+                log::info!("receive batch responses: {}", &msg.pk_idx_vec.len());
                 for pk_idx in msg.pk_idx_vec {
                     if let Some((_, avali)) = self.pks.get_mut(pk_idx) {
                         *avali = Some(())
