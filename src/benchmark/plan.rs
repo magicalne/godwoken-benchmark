@@ -97,7 +97,7 @@ impl Plan {
 
         loop {
             if let Some(pks) = self.next_batch() {
-                log::info!("run next batch: {} requests", pks.len());
+                log::debug!("run next batch: {} requests", pks.len());
                 let batch_handler = self.batch_handler.clone();
                 batch_handler
                     .send_batch(pks, ReqMethod::Submit, 100, 1, 1)
@@ -115,7 +115,7 @@ impl Plan {
             }
 
             if let Ok(msg) = self.batch_res_receiver.try_recv() {
-                log::info!("receive batch responses: {}", &msg.pk_idx_vec.len());
+                log::debug!("receive batch responses: {}", &msg.pk_idx_vec.len());
                 for pk_idx in msg.pk_idx_vec {
                     if let Some((_, avali)) = self.pks.get_mut(pk_idx) {
                         *avali = Some(())
@@ -139,7 +139,7 @@ impl Plan {
         if available_idx_vec.is_empty() {
             return None;
         }
-        log::info!("available: {}", available_idx_vec.len());
+        log::debug!("available: {}", available_idx_vec.len());
         let batch_cnt = cmp::min(available_idx_vec.len(), self.req_batch_cnt);
         loop {
             let nxt = self.rng.gen_range(0..available_idx_vec.len());
