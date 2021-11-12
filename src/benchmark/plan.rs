@@ -99,13 +99,16 @@ impl Plan {
             if let Some(pks) = self.next_batch() {
                 log::info!("run next batch: {} requests", pks.len());
                 let batch_handler = self.batch_handler.clone();
-                if let Err(pks) = batch_handler.try_send_batch(pks, ReqMethod::Submit, 100, 1, 1) {
-                    for pk in pks {
-                        if let Some((_, avail)) = self.pks.get_mut(pk.idx) {
-                            *avail = Some(())
-                        }
-                    }
-                }
+                batch_handler
+                    .send_batch(pks, ReqMethod::Submit, 100, 1, 1)
+                    .await;
+                // if let Err(pks) = batch_handler.try_send_batch(pks, ReqMethod::Submit, 100, 1, 1) {
+                //     for pk in pks {
+                //         if let Some((_, avail)) = self.pks.get_mut(pk.idx) {
+                //             *avail = Some(())
+                //         }
+                //     }
+                // }
             } else {
                 log::warn!("All privkeys are used in txs!");
                 wait_pk_interval.tick().await;
@@ -136,6 +139,7 @@ impl Plan {
         if available_idx_vec.is_empty() {
             return None;
         }
+        log::info!("available: {}", available_idx_vec.len());
         let batch_cnt = cmp::min(available_idx_vec.len(), self.req_batch_cnt);
         loop {
             let nxt = self.rng.gen_range(0..available_idx_vec.len());

@@ -92,6 +92,24 @@ impl BatchHandler {
         Self { sender }
     }
 
+    pub async fn send_batch(
+        &self,
+        pks: Vec<Privkey>,
+        method: ReqMethod,
+        amount: u128,
+        fee: u128,
+        sudt_id: u32,
+    ) {
+        let msg = BatchReqMsg {
+            pks,
+            method,
+            amount,
+            fee,
+            sudt_id,
+        };
+        let _ = self.sender.send(msg).await;
+    }
+
     pub fn try_send_batch(
         &self,
         pks: Vec<Privkey>,
