@@ -40,7 +40,6 @@ impl PolymanClient {
         let from_id = format!("{:#x}", from_id);
         let to_id = format!("{:#x}", to_id);
         let amount = format!("{}", amount);
-        dbg!(&from_id, &to_id, &amount);
         let res = self
             .client
             .get(self.url.clone().join("build_transfer")?)
