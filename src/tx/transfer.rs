@@ -261,8 +261,8 @@ async fn build_erc20_transfer_req(
     if let Status::Failed = res.status {
         return Err(anyhow!("build erc20 tx req failed: {:?}", &res.error));
     }
-    let BuildErc20Response { nonce, args } = res.data.unwrap();
-    let nonce: u32 = nonce.value();
+    let BuildErc20Response {nonce, args } = res.data.unwrap();
+    let nonce = rpc_client.get_nonce(from_id).await?;
 
     let raw_l2transaction = RawL2Transaction::new_builder()
         .from_id(GwPack::pack(&from_id))
