@@ -26,12 +26,14 @@ pub async fn run(
     timeout: u64,
     accounts_path: impl AsRef<Path>,
     url: &str,
+    polyman_url: &str,
     scripts_deployment_path: impl AsRef<Path>,
     rollup_type_hash: String,
 ) -> Result<()> {
     let mut dir = read_dir(accounts_path).await?;
     let mut pks = Vec::new();
     let url = reqwest::Url::parse(url)?;
+    let polyman_url = reqwest::Url::parse(polyman_url)?;
     let scripts_deployment = read_scripts_deployment(scripts_deployment_path)?;
     let rollup_type_hash = H256::from_str(&rollup_type_hash)?;
     while let Some(f) = dir.next_entry().await? {
@@ -49,10 +51,11 @@ pub async fn run(
     let transfer_handler = crate::tx::transfer::TransferHandler::new(
         timeout,
         url.clone(),
+        polyman_url,
         rollup_type_hash.clone(),
         scripts_deployment.clone(),
         stats_handler.clone(),
-    );
+    ).await?;
 
     let stats_fut = async move {
         let mut interval = time::interval(Duration::from_secs(10));
