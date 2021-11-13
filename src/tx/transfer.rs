@@ -1,6 +1,7 @@
 use std::time::{Duration, Instant};
 
 use anyhow::{anyhow, Result};
+use bytes::Bytes;
 use ckb_fixed_hash::H256;
 use ckb_jsonrpc_types::{JsonBytes};
 use ckb_types::prelude::{Builder, Entity};
@@ -262,13 +263,14 @@ async fn build_erc20_transfer_req(
         return Err(anyhow!("build erc20 tx req failed: {:?}", &res.error));
     }
     let BuildErc20Response {nonce, args } = res.data.unwrap();
+    let args = hex::decode(&args)?;
     let nonce = rpc_client.get_nonce(from_id).await?;
 
     let raw_l2transaction = RawL2Transaction::new_builder()
         .from_id(GwPack::pack(&from_id))
         .to_id(GwPack::pack(&build_deploy.proxy_contract_id.value()))
         .nonce(GwPack::pack(&nonce))
-        .args(GwPack::pack(args.as_bytes()))
+        .args(GwPack::pack(&Bytes::from(args)))
         .build();
 
     let sender_script_hash = rpc_client.get_script_hash(from_id).await?;

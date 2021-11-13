@@ -100,7 +100,7 @@ impl Plan {
                 log::debug!("run next batch: {} requests", pks.len());
                 let batch_handler = self.batch_handler.clone();
                 batch_handler
-                    .send_batch(pks, ReqMethod::Submit, 100, 1, 1)
+                    .send_batch(pks, ReqMethod::Submit, 1_000_000_000, 1, 1)
                     .await;
                 // if let Err(pks) = batch_handler.try_send_batch(pks, ReqMethod::Submit, 100, 1, 1) {
                 //     for pk in pks {

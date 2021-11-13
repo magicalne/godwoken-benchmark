@@ -46,7 +46,6 @@ impl PolymanClient {
             .get(self.url.clone().join("build_transfer")?)
             .query(&[("amount", amount), ("from_id", from_id), ("to_id", to_id)])
             .build()?;
-            dbg!(res.url());
             let res = self.client.execute(res).await?;
         Ok(res.json().await?)
     }
