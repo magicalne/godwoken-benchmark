@@ -3,7 +3,7 @@ use std::time::{Duration, Instant};
 use anyhow::{anyhow, Result};
 use bytes::Bytes;
 use ckb_fixed_hash::H256;
-use ckb_jsonrpc_types::{JsonBytes};
+use ckb_jsonrpc_types::JsonBytes;
 use ckb_types::prelude::{Builder, Entity};
 use futures::channel::oneshot;
 use reqwest::Url;
@@ -15,7 +15,10 @@ use crate::{
         polyman::{BuildDeployResponse, BuildErc20Response, PolymanClient, Status},
         types::L2TransactionStatus,
     },
-    benchmark::{msg::ApiStatus, stats::StatsHandler},
+    benchmark::{
+        msg::ApiStatus,
+        stats::{ApiStats, StatsHandler},
+    },
     generated::packed::{L2Transaction, RawL2Transaction, SUDTArgs, SUDTTransfer},
     prelude::Pack as GwPack,
     tx::msg::TxStatus,
@@ -26,6 +29,8 @@ use crate::{
 use super::msg::{TransferInfo, TransferMsg};
 
 const API_SUBMIT_TX: &str = "submit_tx";
+const API_GET_RECEIPT: &str = "get_receipt";
+const API_GET_TX: &str = "get_tx";
 
 pub struct TransferActor {
     url: Url,
@@ -106,7 +111,7 @@ impl TransferActor {
                     let _ = stats_handler
                         .send_api_stats(API_SUBMIT_TX.into(), timer.elapsed(), ApiStatus::Success)
                         .await;
-                    match wait_receipt(&tx, &mut rpc_client, timeout).await {
+                    match wait_receipt(&tx, &mut rpc_client, timeout, stats_handler.clone()).await {
                         Ok(_) => {
                             let _ = stats_handler.send_tx_stats(TxStatus::PendingCommit).await;
                             spawn_wait_committed_task(
@@ -122,7 +127,7 @@ impl TransferActor {
                     };
                 }
                 Err(err) => {
-                    log::error!("submit l2 tx with error: {:?}", err);
+                    log::debug!("submit l2 tx with error: {:?}", err);
                     let _ = stats_handler.send_tx_stats(TxStatus::Failure).await;
                     let _ = stats_handler
                         .send_api_stats(API_SUBMIT_TX.into(), timer.elapsed(), ApiStatus::Failure)
@@ -187,7 +192,7 @@ impl TransferHandler {
         let (sender, receiver) = mpsc::channel(200);
         let polyman_client = PolymanClient::new(polyman_url);
         let build_deploy = deploy_erc20(&polyman_client).await?;
-        
+
         let actor = TransferActor::new(
             timeout,
             url,
@@ -224,9 +229,7 @@ impl TransferHandler {
     }
 }
 
-async fn deploy_erc20(
-    polyman_client: &PolymanClient,
-) -> Result<BuildDeployResponse> {
+async fn deploy_erc20(polyman_client: &PolymanClient) -> Result<BuildDeployResponse> {
     let res = polyman_client.deploy().await?;
     if let Status::Failed = res.status {
         return Err(anyhow!("status failed: {:?}", &res.error));
@@ -262,7 +265,7 @@ async fn build_erc20_transfer_req(
     if let Status::Failed = res.status {
         return Err(anyhow!("build erc20 tx req failed: {:?}", &res.error));
     }
-    let BuildErc20Response {nonce, args } = res.data.unwrap();
+    let BuildErc20Response { nonce, args } = res.data.unwrap();
     let args = hex::decode(&args.trim_start_matches("0x"))?;
     let nonce = rpc_client.get_nonce(from_id).await?;
 
@@ -348,12 +351,26 @@ async fn build_transfer_req(
         .build())
 }
 
-async fn wait_receipt(tx: &H256, rpc_client: &mut GodwokenRpcClient, timeout: u64) -> Result<()> {
+async fn wait_receipt(
+    tx: &H256,
+    rpc_client: &mut GodwokenRpcClient,
+    timeout: u64,
+    stats_handler: StatsHandler,
+) -> Result<()> {
     let ts = Instant::now();
     let mut interval = tokio::time::interval(Duration::from_secs(5));
     loop {
         interval.tick().await;
-        if let Ok(res) = rpc_client.get_transaction_receipt(tx).await {
+        let ticker = Instant::now();
+        let res = rpc_client.get_transaction_receipt(tx).await;
+        let api_status = match &res {
+            Ok(_) => ApiStatus::Success,
+            Err(_) => ApiStatus::Failure,
+        };
+        stats_handler
+            .send_api_stats(String::from(API_GET_RECEIPT), ticker.elapsed(), api_status)
+            .await;
+        if let Ok(res) = res {
             match res {
                 Some(_) => {
                     log::debug!("pending commit tx: {}", hex::encode(tx));
@@ -369,12 +386,26 @@ async fn wait_receipt(tx: &H256, rpc_client: &mut GodwokenRpcClient, timeout: u6
     }
 }
 
-async fn wait_committed(tx: &H256, rpc_client: &mut GodwokenRpcClient, timeout: u64) -> Result<()> {
+async fn wait_committed(
+    tx: &H256,
+    rpc_client: &mut GodwokenRpcClient,
+    timeout: u64,
+    stats_handler: StatsHandler,
+) -> Result<()> {
     let ts = Instant::now();
     let mut interval = tokio::time::interval(Duration::from_secs(5));
     loop {
         interval.tick().await;
-        if let Ok(Some(tx_status)) = rpc_client.get_transaction(tx).await {
+        let ticker = Instant::now();
+        let res = rpc_client.get_transaction(tx).await;
+        let api_status = match &res {
+            Ok(_) => ApiStatus::Success,
+            Err(_) => ApiStatus::Failure,
+        };
+        stats_handler
+            .send_api_stats(String::from(API_GET_TX), ticker.elapsed(), api_status)
+            .await;
+        if let Ok(Some(tx_status)) = res {
             if tx_status.status == L2TransactionStatus::Committed {
                 log::debug!("committed tx: {}", hex::encode(tx));
                 return Ok(());
@@ -393,7 +424,7 @@ fn spawn_wait_committed_task(
     timeout: u64,
 ) {
     tokio::spawn(async move {
-        match wait_committed(&tx, &mut rpc_client, timeout).await {
+        match wait_committed(&tx, &mut rpc_client, timeout, stats_handler.clone()).await {
             Ok(_) => {
                 let _ = stats_handler
                     .send_tx_stats(TxStatus::Committed(Some(tx)))

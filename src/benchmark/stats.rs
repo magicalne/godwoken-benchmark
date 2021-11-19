@@ -116,6 +116,8 @@ pub struct ApiStats {
     avg: f32,
     success: usize,
     failure: usize,
+    success_rate: f32,
+    failure_rate: f32,
 }
 struct ApiStatsHandler {
     deq: VecDeque<Duration>,
@@ -124,11 +126,13 @@ struct ApiStatsHandler {
     min: u128,
     success: usize,
     failure: usize,
+    ticker: Instant,
 }
 
 impl ApiStatsHandler {
     fn new(limit: usize) -> Self {
         Self {
+            ticker: Instant::now(),
             deq: VecDeque::new(),
             limit,
             max: 0,
@@ -167,12 +171,17 @@ impl ApiStatsHandler {
         } else {
             sum as f32 / self.deq.len() as f32
         };
+        let elasped_secs = self.ticker.elapsed().as_secs_f32();
+        let success_rate = self.success as f32 / elasped_secs;
+        let failure_rate = self.failure as f32 / elasped_secs;
         ApiStats {
             min: self.min,
             max: self.max,
             avg,
             success: self.success,
             failure: self.failure,
+            success_rate,
+            failure_rate,
         }
     }
 }
