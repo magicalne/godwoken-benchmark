@@ -1,15 +1,20 @@
 use std::time::{Duration, Instant};
 
 use anyhow::{anyhow, Result};
+use bytes::Bytes;
 use ckb_fixed_hash::H256;
-use ckb_jsonrpc_types::JsonBytes;
+use ckb_jsonrpc_types::{JsonBytes};
 use ckb_types::prelude::{Builder, Entity};
 use futures::channel::oneshot;
 use reqwest::Url;
 use tokio::sync::mpsc::{self, Sender};
 
 use crate::{
-    api::{godwoken_rpc::GodwokenRpcClient, types::L2TransactionStatus},
+    api::{
+        godwoken_rpc::GodwokenRpcClient,
+        polyman::{BuildDeployResponse, BuildErc20Response, PolymanClient, Status},
+        types::L2TransactionStatus,
+    },
     benchmark::{msg::ApiStatus, stats::StatsHandler},
     generated::packed::{L2Transaction, RawL2Transaction, SUDTArgs, SUDTTransfer},
     prelude::Pack as GwPack,
@@ -29,12 +34,16 @@ pub struct TransferActor {
     rollup_type_hash: H256,
     timeout: u64,
     stats_handler: StatsHandler,
+    polyman_client: PolymanClient,
+    build_deploy: BuildDeployResponse,
 }
 
 impl TransferActor {
     pub fn new(
         timeout: u64,
         url: Url,
+        polyman_client: PolymanClient,
+        build_deploy: BuildDeployResponse,
         rollup_type_hash: H256,
         scripts_deployment: ScriptsDeploymentResult,
         receiver: mpsc::Receiver<TransferMsg>,
@@ -43,6 +52,8 @@ impl TransferActor {
         Self {
             timeout,
             url,
+            polyman_client,
+            build_deploy,
             rollup_type_hash,
             scripts_deployment,
             receiver,
@@ -63,13 +74,18 @@ impl TransferActor {
         let url = self.url.clone();
         let timeout = self.timeout;
         let stats_handler = self.stats_handler.clone();
+        let polyman_client = self.polyman_client.clone();
+        let build_deploy = self.build_deploy.clone();
         tokio::spawn(async move {
             let mut rpc_client = GodwokenRpcClient::new(url);
-            let bytes = match build_transfer_req(
+            // let bytes = match build_transfer_req(
+            let bytes = match build_erc20_transfer_req(
                 tx_info,
                 &mut rpc_client,
+                &polyman_client,
                 &rollup_type_hash,
                 &scripts_deployment,
+                &build_deploy,
             )
             .await
             .map(|req| JsonBytes::from_bytes(req.as_bytes()))
@@ -160,17 +176,23 @@ pub struct TransferHandler {
 }
 
 impl TransferHandler {
-    pub fn new(
+    pub async fn new(
         timeout: u64,
         url: Url,
+        polyman_url: Url,
         rollup_type_hash: H256,
         scripts_deployment: ScriptsDeploymentResult,
         stats_handler: StatsHandler,
-    ) -> Self {
+    ) -> Result<Self> {
         let (sender, receiver) = mpsc::channel(200);
+        let polyman_client = PolymanClient::new(polyman_url);
+        let build_deploy = deploy_erc20(&polyman_client).await?;
+        
         let actor = TransferActor::new(
             timeout,
             url,
+            polyman_client,
+            build_deploy,
             rollup_type_hash,
             scripts_deployment,
             receiver,
@@ -179,7 +201,7 @@ impl TransferHandler {
 
         tokio::spawn(transfer_handler(actor));
 
-        Self { sender }
+        Ok(Self { sender })
     }
 
     // The return value is a two-stage-tuple of status.
@@ -200,6 +222,71 @@ impl TransferHandler {
         let _ = recv.await?;
         Ok(())
     }
+}
+
+async fn deploy_erc20(
+    polyman_client: &PolymanClient,
+) -> Result<BuildDeployResponse> {
+    let res = polyman_client.deploy().await?;
+    if let Status::Failed = res.status {
+        return Err(anyhow!("status failed: {:?}", &res.error));
+    };
+    Ok(res.data.unwrap())
+}
+
+async fn build_erc20_transfer_req(
+    tx_info: TransferInfo,
+    rpc_client: &mut GodwokenRpcClient,
+    polyman_client: &PolymanClient,
+    rollup_type_hash: &H256,
+    scripts_deployment: &ScriptsDeploymentResult,
+    build_deploy: &BuildDeployResponse,
+) -> Result<L2Transaction> {
+    let TransferInfo {
+        pk_from,
+        pk_to,
+        amount,
+        fee,
+        sudt_id,
+    } = tx_info;
+    let from_address =
+        utils::privkey_to_short_address(&pk_from, rollup_type_hash, scripts_deployment)?;
+
+    let from_id = utils::short_address_to_account_id(rpc_client, &from_address).await?;
+    let from_id = from_id.unwrap();
+    let to_address = utils::privkey_to_short_address(&pk_to, rollup_type_hash, scripts_deployment)?;
+    let to_id = utils::short_address_to_account_id(rpc_client, &to_address)
+        .await?
+        .unwrap();
+    let res = polyman_client.build_erc20(from_id, to_id, amount).await?;
+    if let Status::Failed = res.status {
+        return Err(anyhow!("build erc20 tx req failed: {:?}", &res.error));
+    }
+    let BuildErc20Response {nonce, args } = res.data.unwrap();
+    let args = hex::decode(&args.trim_start_matches("0x"))?;
+    let nonce = rpc_client.get_nonce(from_id).await?;
+
+    let raw_l2transaction = RawL2Transaction::new_builder()
+        .from_id(GwPack::pack(&from_id))
+        .to_id(GwPack::pack(&build_deploy.proxy_contract_id.value()))
+        .nonce(GwPack::pack(&nonce))
+        .args(GwPack::pack(&Bytes::from(args)))
+        .build();
+
+    let sender_script_hash = rpc_client.get_script_hash(from_id).await?;
+
+    let message = utils::generate_transaction_message_to_sign(
+        &raw_l2transaction,
+        rollup_type_hash,
+        &sender_script_hash,
+        &build_deploy.proxy_contract_script_hash,
+    );
+    let signature = utils::eth_sign(&message, pk_from)?;
+
+    Ok(L2Transaction::new_builder()
+        .raw(raw_l2transaction)
+        .signature(signature.pack())
+        .build())
 }
 
 async fn build_transfer_req(

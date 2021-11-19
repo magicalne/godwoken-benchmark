@@ -40,6 +40,12 @@ pub async fn main() -> Result<()> {
                         .help("godwoken url"),
                 )
                 .arg(
+                    Arg::with_name("polyman-url")
+                        .short("o")
+                        .takes_value(true)
+                        .help("polyman url"),
+                )
+                .arg(
                     Arg::with_name("scripts_deployment_path")
                         .short("s")
                         .takes_value(true)
@@ -64,6 +70,7 @@ pub async fn main() -> Result<()> {
         let timeout = m.value_of("timeout").unwrap();
         let path = m.value_of("account-path").unwrap_or("accounts");
         let url = m.value_of("url").unwrap_or("localhost");
+        let polyman_url = m.value_of("polyman-url").unwrap_or("localhost");
         let rollup_type_hash = m.value_of("rollup_type_hash").unwrap();
         let scripts_deployment_path = m.value_of("scripts_deployment_path").unwrap();
         benchmark::run(
@@ -72,6 +79,7 @@ pub async fn main() -> Result<()> {
             timeout.parse()?,
             path,
             url,
+            polyman_url,
             scripts_deployment_path,
             rollup_type_hash.to_string(),
         )

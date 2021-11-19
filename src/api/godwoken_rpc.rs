@@ -184,13 +184,3 @@ impl GodwokenRpcClient {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use anyhow::Result;
-
-    #[tokio::test]
-    pub async fn test() -> Result<()> {
-        Ok(())
-    }
-}
